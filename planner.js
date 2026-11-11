@@ -1,17 +1,15 @@
 (()=>{
-const E=window.ENROLLMENT_DATA,D=window.DEGREE_MAP_DATA,LV=['Freshman','Sophomore','Junior','Senior','Graduate'],$=s=>document.querySelector(s),H=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const E=window.ENROLLMENT_DATA,D=window.DEGREE_MAP_DATA,C=window.WPUPlannerCore,LV=['Freshman','Sophomore','Junior','Senior','Graduate'],$=s=>document.querySelector(s),H=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const KEY='wpu-course-planner-degree-map-v1',old=JSON.parse(localStorage.getItem(KEY)||'{}'),inv=window.CLASSROOM_DATA?.rooms||[];
 const S={major:old.major||Object.keys(E.majors)[0],term:old.term||next(E.terms.at(-1)),courses:old.courses||[],rooms:old.rooms?.length?old.rooms:inv};
-const A={'Applied Computer Science - Computer Science':'Computer Science (Applied Computer Science)','Applied Computer Science - Software Engineering':'Software Engineering (Applied Computer Science)','Applied Computer Science- Information Technology':'Information Technology (Applied Computer Science)','Accounting- General':'Accounting','Accounting- Public':'Accounting'};
-const ord=t=>({SP:0,SU:1,FA:2}[t.slice(0,2)]+Number(t.slice(2))*3),nice=t=>(t.slice(0,2)==='FA'?'Fall':t.slice(0,2)==='SP'?'Spring':'Summer')+' '+t.slice(2),norm=s=>String(s).toLowerCase().replace(/\(.*?\)/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-function next(t){const a=t.slice(0,2),y=+t.slice(2);return a==='FA'?'SP'+(y+1):a==='SP'?'SU'+y:'FA'+y}function save(){localStorage.setItem(KEY,JSON.stringify(S))}
-function program(){const w=norm(A[S.major]||S.major),p=D.programs.filter(x=>x.kind==='Major');return p.find(x=>norm(x.name)===w)||p.find(x=>norm(x.name).includes(w)||w.includes(norm(x.name)))||null}
-function level(code){const m=String(code).match(/\s(\d)\d\d/);return m?({1:'Freshman',2:'Sophomore',3:'Junior',4:'Senior',5:'Graduate'}[m[1]]||'Senior'):'Senior'}
-function fromMap(){const root=program();if(!root)return[];const seen=new Set(),blocks=[],add=p=>{if(!p||seen.has(p.id))return;seen.add(p.id);p.inc.forEach(id=>add(D.programs.find(x=>x.id===id)));blocks.push(p)};add(root);const used=new Set();return blocks.flatMap(p=>p.items||[]).filter(x=>x.t==='c'&&x.codes?.length).map(x=>{const code=x.codes[0];if(used.has(code))return null;used.add(code);const d=D.courses[code]||{};return{code:code,name:d.title||x.title||code,level:level(code),rate:1,seats:24,features:''}}).filter(Boolean)}
-function same(){return Object.entries(E.majors[S.major].terms).filter(([t])=>t.slice(0,2)===S.term.slice(0,2)).sort((a,b)=>ord(a[0])-ord(b[0]))}
-function forecast(l){const v=same().map(([,x])=>l?(+x.levels[l]||0):+x.headcount).slice(-4);if(!v.length)return 0;const avg=v.reduce((a,b)=>a+b,0)/v.length;if(v.length<2)return Math.round(avg);const mid=(v.length-1)/2;let n=0,d=0;v.forEach((x,i)=>{n+=(i-mid)*(x-avg);d+=(i-mid)*(i-mid)});return Math.max(0,Math.round(avg+(d?n/d:0)))}
-function room(c,need){if(!need)return null;const wants=String(c.features||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean),cap=Math.min(Math.max(1,+c.seats||1),need);return S.rooms.filter(r=>r.capacity>=cap&&wants.every(w=>(r.room+' '+(r.building||'')+' '+(r.features||'')).toLowerCase().includes(w))).sort((a,b)=>a.capacity-b.capacity)[0]||null}
-function calc(c){const students=Math.round(forecast(c.level)*(+c.rate||0));return{students:students,sections:Math.ceil(students/Math.max(1,+c.seats||1)),room:room(c,students)}}
+const ord=C.termOrder,nice=t=>(t.slice(0,2)==='FA'?'Fall':t.slice(0,2)==='SP'?'Spring':'Summer')+' '+t.slice(2);
+function next(t){return C.nextTerm(t)}function save(){localStorage.setItem(KEY,JSON.stringify(S))}
+function program(){return C.programFor(S.major,D)}
+function fromMap(){return C.mapCourses(S.major,D)}
+function same(){return C.sameTermRecords(E,S.major,S.term)}
+function forecast(l){return C.forecast(E,S.major,S.term,l)}
+function room(c,need){return C.fitRoom(S.rooms,c,need)}
+function calc(c){return C.calculateCourse(E,S.major,S.term,S.rooms,c)}
 function roomName(r){return r?(r.building?r.building+' · ':'')+r.room:'No room fit'}
 function status(){const p=program(),n=fromMap().length;$('#mapStatus').innerHTML=p?'<b>'+H(p.name)+'</b> matched in the Degree Map. '+n+' required catalog courses will load and be forecast from the corresponding academic-year group.':'<b>No Degree Map match yet.</b> Enrollment can still be viewed, but course recommendations require a matching catalog program.'}
 function sync(){const majors=Object.keys(E.majors);$('#major').innerHTML=majors.map(x=>'<option'+(x===S.major?' selected':'')+'>'+H(x)+'</option>').join('');let ts=[],t=S.term;for(let i=0;i<8;i++){ts.push(t);t=next(t)}$('#term').innerHTML=ts.map(t=>'<option value="'+t+'"'+(t===S.term?' selected':'')+'>'+nice(t)+'</option>').join('');status()}
