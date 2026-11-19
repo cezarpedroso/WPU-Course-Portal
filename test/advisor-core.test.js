@@ -6,6 +6,7 @@ const core=require('../advisor-core.js');
 
 function loadWindowData(file,key){const sandbox={window:{}};vm.runInNewContext(fs.readFileSync(file,'utf8'),sandbox);return sandbox.window[key]}
 const degreeMap=loadWindowData('degree-map-data.js','DEGREE_MAP_DATA');
+const catalog=loadWindowData('course-catalog-data.js','WPU_COURSE_CATALOG');
 
 test('parses course rows from copied unofficial transcript text',()=>{
   const rows=core.transcriptCourses('APCS201 Programming Fundamentals 2.00 B Curriculum No APCS206 Object Oriented Programming 2.00 C- Curriculum No HIST132 American History Since 1900 3.00 W Curriculum No');
@@ -22,6 +23,13 @@ test('loads Software Engineering degree requirements from the Degree Map',()=>{
   assert.ok(courses.some(course=>course.code==='APCS 215'));
   assert.ok(courses.some(course=>course.code==='APCS 360'));
   assert.ok(courses.some(course=>course.code==='APCS 350'));
+});
+
+test('uses catalog descriptions in advisor course details',()=>{
+  const courses=core.programCourses('Software Engineering (Applied Computer Science)',degreeMap,catalog);
+  const apcs201=courses.find(course=>course.code==='APCS 201');
+  assert.equal(apcs201.title,'Programming Fundamentals');
+  assert.match(apcs201.description,/structured programming/i);
 });
 
 test('blocks a course when a listed prerequisite is incomplete',()=>{
