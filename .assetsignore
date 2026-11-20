@@ -1,0 +1,7 @@
+.git
+.github
+scripts
+test
+package.json
+wrangler.jsonc
+.assetsignore
